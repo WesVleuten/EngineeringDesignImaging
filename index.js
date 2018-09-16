@@ -39,14 +39,11 @@ getPixels('test.jpg', function(err, pixels) {
     let lightness = [];
     let currentPixelChannelIndex = 0;
     while (currentPixelChannelIndex < datalength) {
-        let currentPixel = new Pixel();
-        currentPixel.setRed(data[currentPixelChannelIndex]);
-        currentPixel.setGreen(data[currentPixelChannelIndex+1]);
-        currentPixel.setBlue(data[currentPixelChannelIndex+2]);
-        if (channels == 4) {
-            currentPixel.setAlpha(data[currentPixelChannelIndex+3]);
-        }
-        const l = currentPixel.getLightness();
+        const r = data[currentPixelChannelIndex];
+        const g = data[currentPixelChannelIndex+1];
+        const b = data[currentPixelChannelIndex+2];
+
+        const l = (Math.max(r,g,b) + Math.min(r,g,b)) / 2;
         lightness.push(l);
 
         currentPixelChannelIndex += channels;
@@ -78,26 +75,20 @@ getPixels('test.jpg', function(err, pixels) {
     const first1ForEveryY_L = [];
     const first1ForEveryY_R = [];
     for (let y = 0; y < screenY.length; y++) {
-        first1ForEveryY_R[y] = startX;
-        while(screenY[y][first1ForEveryY_R[y]] == 0) {
-            first1ForEveryY_R[y]++;
-            if (first1ForEveryY_R[y] > width) {
-                //infinite loop prevention
-                screenY[y][first1ForEveryY_R[y]] = null;
+        let r = startX;
+        let l = startX;
+        while(screenY[y][r++] == 0) {
+            if (r > width) {
                 break;
             }
         }
-        first1ForEveryY_L[y] = startX;
-        while(screenY[y][first1ForEveryY_L[y]] == 0) {
-            first1ForEveryY_L[y]--;
-            if (first1ForEveryY_L[y] < 0) {
-                //infinite loop prevention
-                screenY[y][first1ForEveryY_L[y]] = null;
+        while(screenY[y][l--] == 0) {
+            if (l < 0) {
                 break;
             }
         }
-        screenY[y][first1ForEveryY_L[y]] = 2;
-        screenY[y][first1ForEveryY_R[y]] = 2;
+        screenY[y][r] = 2;
+        screenY[y][l] = 2;
     }
     console.timeEnd('middlecheck');
     console.time('currentlanedetect');
@@ -106,18 +97,9 @@ getPixels('test.jpg', function(err, pixels) {
     while(changes != 0) {
         changes = 0;
         for (let y = 0; y < screenY.length; y++) {
-            //grow twos
-            //console.log(screenY[y].length, width);
+            //grow twos horizontally
             for (let x = 0; x < screenY[y].length; x++) {
                 if (screenY[y][x] != 2) continue;
-                // if (y-1 > 0 && screenY[y-1][x] == 1) {
-                //     if (screenY[y-1][x] != 2) changes++;
-                //     screenY[y-1][x] = 2;
-                // }
-                // if (y+1 < height && screenY[y+1][x] == 1) {
-                //     if (screenY[y+1][x] != 2) changes++;
-                //     screenY[y+1][x] = 2;
-                // }
                 if (x+1 < width && screenY[y][x+1] == 1) {
                     changes++;
                     screenY[y][x+1] = 2;
@@ -143,34 +125,3 @@ getPixels('test.jpg', function(err, pixels) {
     //detect lines
     
 });
-
-class Pixel {
-    constructor() {
-        this.red = null;
-        this.blue = null;
-        this.green = null;
-        this.alpha = 255;
-    }
-    getRGB() {
-        return {
-            red: this.red,
-            blue: this.blue,
-            green: this.green
-        };
-    }
-    getLightness() {
-        return (Math.max(this.red, this.blue, this.green) + Math.min(this.red, this.blue, this.green))/2;
-    }
-    setRed(red) {
-        this.red = red;
-    }
-    setBlue(blue) {
-        this.blue = blue;
-    }
-    setGreen(green) {
-        this.green = green;
-    }
-    setAlpha(alpha) {
-        this.alpha = alpha;
-    }
-}
