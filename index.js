@@ -129,7 +129,10 @@ getPixels('test.jpg', function(err, pixels) {
     console.timeEnd('otherlaneclear');
 
     console.timeEnd('full');
-    fs.writeFile('./result3.txt', screenY.map(x => x.join('')).join('\n'), onerror);
+    try {
+        fs.mkdirSync('./result');
+    } catch(e) {}
+    fs.writeFile('./result/3.txt', screenY.map(x => x.join('')).join('\n'), onerror);
 
     //detect lines
     
