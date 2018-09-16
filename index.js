@@ -1,8 +1,7 @@
 const getPixels = require('get-pixels');
 const fs = require('fs');
 const percentile = 0.95; // percentile threshold for determining lines
-const vskiprate = 1; // the amount of vertical pixels it will skip
-const hskiprate = 1; // the amount of horizontal pixels it will skip
+const CUTOFFDYNAMIC = false;
 
 const onerror = (a, b) => { if (b) console.log(b); };
 
@@ -14,7 +13,7 @@ getPixels('test.jpg', function(err, pixels) {
         return;
     }
     console.timeEnd('pixels');
-    console.time('imagegrid');
+    console.time('constants');
 
     const width = pixels.shape[0];
     const height = pixels.shape[1];
@@ -22,6 +21,11 @@ getPixels('test.jpg', function(err, pixels) {
     const channels = pixels.shape[2];
     const data = pixels.data;
     const datalength = data.length;
+
+    console.timeEnd('constants');
+    console.time('imagegrid');
+
+
     if (channels < 3 || channels > 4) {
         console.log('unsupported amount of channels');
         return;
@@ -45,22 +49,24 @@ getPixels('test.jpg', function(err, pixels) {
         const l = currentPixel.getLightness();
         lightness.push(l);
 
-        //is end of line
-        if ((currentPixelChannelIndex+1) % width == 0) {
-            //can assume is int and not float because we checked the remainer above
-            currentPixelChannelIndex += width * channels * hskiprate;
-        }
-        currentPixelChannelIndex += channels * (vskiprate + 1);
+        currentPixelChannelIndex += channels;
 
     }
     console.timeEnd('imagegrid');
     console.time('lightcutoff');
-    let lightnesscutoff = lightness.slice().sort((a, b) => a - b)[Math.round(lightness.length * percentile)];
+    let lightcutoff;
+    if (CUTOFFDYNAMIC) {
+        lightnesscutoff = lightness.slice().sort((a, b) => a - b)[Math.round(lightness.length * percentile)];
+    } else {
+        lightnesscutoff = Math.max(...lightness) - 60;
+    }
+    
     console.timeEnd('lightcutoff');
     console.time('lightgrid');
+    
     for (let i = 0; i < lightness.length; i++) {
         screenX.push(lightness[i] < lightnesscutoff? 0: 1);
-        if ((i+1) % (width / (vskiprate + 1)) == 0) {
+        if ((i+1) % width == 0) {
             screenY.push(screenX);
             screenX = [];
         }
