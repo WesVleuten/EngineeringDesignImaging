@@ -1,30 +1,28 @@
-const getPixels = require('get-pixels');
 const fs = require('fs');
 const percentile = 0.95; // percentile threshold for determining lines
 const CUTOFFDYNAMIC = false;
+const PNG = require('pngjs').PNG;
 
 const onerror = (a, b) => { if (b) console.log(b); };
 
 console.time('full');
 console.time('pixels')
-getPixels('test.jpg', function(err, pixels) {
-    if(err) {
-        console.log('Bad image path');
-        return;
-    }
+
+fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
+    const pixels = this;
+
     console.timeEnd('pixels');
     console.time('constants');
 
-    const width = pixels.shape[0];
-    const height = pixels.shape[1];
+    const width = pixels.width;
+    const height = pixels.height;
     const pixelCount = width * height;
-    const channels = pixels.shape[2];
+    const channels = 4;
     const data = pixels.data;
     const datalength = data.length;
 
     console.timeEnd('constants');
     console.time('imagegrid');
-
 
     if (channels < 3 || channels > 4) {
         console.log('unsupported amount of channels');
@@ -51,7 +49,7 @@ getPixels('test.jpg', function(err, pixels) {
     }
     console.timeEnd('imagegrid');
     console.time('lightcutoff');
-    let lightcutoff;
+    let lightnesscutoff;
     if (CUTOFFDYNAMIC) {
         lightnesscutoff = lightness.slice().sort((a, b) => a - b)[Math.round(lightness.length * percentile)];
     } else {

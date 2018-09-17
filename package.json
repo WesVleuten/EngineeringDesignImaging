@@ -5,6 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "get-pixels": "^3.3.2",
+    "jpeg-js": "^0.3.4",
     "timsort": "^0.3.0"
   },
   "devDependencies": {},
