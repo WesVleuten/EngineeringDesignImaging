@@ -91,21 +91,21 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
     console.timeEnd('middlecheck');
     console.time('currentlanedetect');
 
-    let changes = -1;
-    while(changes != 0) {
-        changes = 0;
-        for (let y = 0; y < screenY.length; y++) {
+    const set2 = (x, y) => {
+        if (screenY[y][x] != 1) return 0;
+        if (x < 0 || x > width) return 0;
+        screenY[y][x] = 2;
+        return 1;
+    };
+    
+    for (let y = 0; y < screenY.length; y++) {
+        let changes = -1;
+        while(changes != 0) {
+            changes = 0;
             //grow twos horizontally
             for (let x = 0; x < screenY[y].length; x++) {
                 if (screenY[y][x] != 2) continue;
-                if (x+1 < width && screenY[y][x+1] == 1) {
-                    changes++;
-                    screenY[y][x+1] = 2;
-                }
-                if (x-1 > 0 && screenY[y][x-1] == 1) {
-                    changes++;
-                    screenY[y][x-1] = 2;
-                }
+                changes += set2(x+1, y) + set2(x-1, y);
             }
         }
     }
