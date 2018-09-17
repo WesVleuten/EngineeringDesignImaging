@@ -99,13 +99,12 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
     };
     
     for (let y = 0; y < screenY.length; y++) {
-        let changes = -1;
+        let changes = 1;
         while(changes != 0) {
-            changes = 0;
             //grow twos horizontally
             for (let x = 0; x < screenY[y].length; x++) {
                 if (screenY[y][x] != 2) continue;
-                changes += set2(x+1, y) + set2(x-1, y);
+                changes = set2(x+1, y) + set2(x-1, y);
             }
         }
     }
