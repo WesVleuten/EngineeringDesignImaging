@@ -92,8 +92,9 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
     console.time('currentlanedetect');
 
     const set2 = (x, y) => {
+        if (!screenY[y]) return 0;
+        if (!screenY[y][x]) return 0;
         if (screenY[y][x] != 1) return 0;
-        if (x < 0 || x > width) return 0;
         screenY[y][x] = 2;
         return 1;
     };
@@ -102,9 +103,11 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
         let changes = 1;
         while(changes != 0) {
             //grow twos horizontally
+            changes = 0;
             for (let x = 0; x < screenY[y].length; x++) {
                 if (screenY[y][x] != 2) continue;
-                changes = set2(x+1, y) + set2(x-1, y);
+                changes += set2(x+1, y) + set2(x-1, y);
+                changes += set2(x, y+1) + set2(x, y-1);
             }
         }
     }
@@ -117,8 +120,8 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
     try {
         fs.mkdirSync('./result');
     } catch(e) {}
-    fs.writeFile('./result/3.txt', screenY.map(x => x.join('')).join('\n'), onerror);
+    const r3 = screenY.map(x => x.join('')).join('\n');
+    fs.writeFile('./result/3.txt', r3, onerror);
 
-    //detect lines
     
 });
