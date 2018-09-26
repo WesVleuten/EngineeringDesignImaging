@@ -150,6 +150,40 @@ fs.readFile(inputfile, function(err, buf) {
         pi.save('./result/process3_lane.png', onerror);
     }
 
-    
+    console.time('makepath');
+
+    for (let y = 0; y < height; y++) {
+        let indexes = 0;
+        let sum = 0;
+        for (let x = 0; x < width; x++) {
+            if (screenY[y][x] != 2) {
+                continue;
+            }
+            indexes++;
+            sum += x;
+        }
+        screenY[y][Math.round( sum / indexes )] = 3;
+    }
+
+    console.timeEnd('makepath');
+
+    if (CREATEPROCESSINGIMAGES) {
+        const pi = new PngImg(buf);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let c = '#ffffff';
+                if (screenY[y][x] == 2) {
+                    c = '#000000';
+                }
+                if (screenY[y][x] == 3) {
+                    c = '#888888';
+                }
+                pi.set(x, y, c);
+            }
+        }
+        pi.save('./result/process4_path.png', onerror);
+    }
+
+
     console.timeEnd('full');
 });
