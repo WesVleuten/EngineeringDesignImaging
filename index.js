@@ -1,25 +1,31 @@
-const fs = require('fs');
+const inputfile = 'test.png';
 const percentile = 0.95; // percentile threshold for determining lines
-const CUTOFFDYNAMIC = false;
-const PNG = require('pngjs').PNG;
+const CUTOFFDYNAMIC = true;
+const CREATEPROCESSINGIMAGES = true;
 
+const fs = require('fs');
+const PngImg = require('png-img');
 const onerror = (a, b) => { if (b) console.log(b); };
 
+try {
+    fs.mkdirSync('./result');
+} catch(e) {}
+
 console.time('full');
-console.time('pixels')
+console.time('getimage')
 
-fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
-    const pixels = this;
+fs.readFile(inputfile, function(err, buf) {
+    if (err) throw err;
 
-    console.timeEnd('pixels');
+    const image = new PngImg(buf);
+    const size = image.size();
+
+    console.timeEnd('getimage');
     console.time('constants');
 
-    const width = pixels.width;
-    const height = pixels.height;
-    const pixelCount = width * height;
+    const width = size.width;
+    const height = size.height;
     const channels = 4;
-    const data = pixels.data;
-    const datalength = data.length;
 
     console.timeEnd('constants');
     console.time('imagegrid');
@@ -28,26 +34,35 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
         console.log('unsupported amount of channels');
         return;
     }
-    if (pixels.data.length != pixelCount * channels) {
-        console.log('corrupted image data');
-        return;
-    }
+
     let screenY = [];
     let screenX = [];
     let lightness = [];
-    let currentPixelChannelIndex = 0;
-    while (currentPixelChannelIndex < datalength) {
-        const r = data[currentPixelChannelIndex];
-        const g = data[currentPixelChannelIndex+1];
-        const b = data[currentPixelChannelIndex+2];
-
-        const l = (Math.max(r,g,b) + Math.min(r,g,b)) / 2;
-        lightness.push(l);
-
-        currentPixelChannelIndex += channels;
-
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const p = image.get(x, y);
+            const l = (Math.max(p.r, p.g, p.b) + Math.min(p.r, p.g, p.b)) / 2;
+            lightness.push(l);
+        }
     }
+
     console.timeEnd('imagegrid');
+
+    if (CREATEPROCESSINGIMAGES) {
+        const pi = new PngImg(buf);
+        for (let i = 0; i < lightness.length; i++) {
+            const x = i % width;
+            const y = Math.floor(i / width);
+            pi.set(x, y, {
+                r: lightness[i],
+                g: lightness[i],
+                b: lightness[i],
+                a: 255
+            });
+        }
+        pi.save('./result/process1_lightness.png', onerror);
+    }
+
     console.time('lightcutoff');
     let lightnesscutoff;
     if (CUTOFFDYNAMIC) {
@@ -67,11 +82,20 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
         }
     }
     console.timeEnd('lightgrid');
+
+    if (CREATEPROCESSINGIMAGES) {
+        const pi = new PngImg(buf);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                pi.set(x, y, screenY[y][x] == 1? '#000000': '#ffffff');
+            }
+        }
+        pi.save('./result/process2_lines.png', onerror);
+    }
+
     console.time('middlecheck');
 
     const startX = screenY[0].length/2;
-    const first1ForEveryY_L = [];
-    const first1ForEveryY_R = [];
     for (let y = 0; y < screenY.length; y++) {
         let r = startX;
         let l = startX;
@@ -98,7 +122,7 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
         screenY[y][x] = 2;
         return 1;
     };
-    
+
     for (let y = 0; y < screenY.length; y++) {
         let changes = 1;
         while(changes != 0) {
@@ -116,12 +140,16 @@ fs.createReadStream('testsmall.png').pipe(new PNG()).on('parsed', function() {
     screenY = screenY.map(y => y.map(x => x == 1? 0 : x));
     console.timeEnd('otherlaneclear');
 
-    console.timeEnd('full');
-    try {
-        fs.mkdirSync('./result');
-    } catch(e) {}
-    const r3 = screenY.map(x => x.join('')).join('\n');
-    fs.writeFile('./result/3.txt', r3, onerror);
+    if (CREATEPROCESSINGIMAGES) {
+        const pi = new PngImg(buf);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                pi.set(x, y, screenY[y][x] == 2? '#000000': '#ffffff');
+            }
+        }
+        pi.save('./result/process3_lane.png', onerror);
+    }
 
     
+    console.timeEnd('full');
 });
