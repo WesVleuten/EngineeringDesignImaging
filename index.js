@@ -196,7 +196,7 @@ fs.readFile(inputfile, function(err, buf) {
                 });
             }
         }
-        pi.save('./result/process5_lines.png', onerror);
+        pi.save('./result/process4_lines.png', onerror);
     }
 
 
