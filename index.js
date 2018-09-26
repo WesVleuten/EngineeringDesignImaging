@@ -3,6 +3,11 @@ const percentile = 0.95; // percentile threshold for determining lines
 const CUTOFFDYNAMIC = true;
 const CREATEPROCESSINGIMAGES = true;
 
+
+const LANELINE = 2;
+const LIGHTPIXEL = 1;
+
+
 const fs = require('fs');
 const PngImg = require('png-img');
 const onerror = (a, b) => { if (b) console.log(b); };
@@ -70,12 +75,12 @@ fs.readFile(inputfile, function(err, buf) {
     } else {
         lightnesscutoff = Math.max(...lightness) - 60;
     }
-    
+
     console.timeEnd('lightcutoff');
     console.time('lightgrid');
-    
+
     for (let i = 0; i < lightness.length; i++) {
-        screenX.push(lightness[i] < lightnesscutoff? 0: 1);
+        screenX.push(lightness[i] < lightnesscutoff? 0: LIGHTPIXEL);
         if ((i+1) % width == 0) {
             screenY.push(screenX);
             screenX = [];
@@ -109,8 +114,8 @@ fs.readFile(inputfile, function(err, buf) {
                 break;
             }
         }
-        screenY[y][r] = 2;
-        screenY[y][l] = 2;
+        screenY[y][r] = LANELINE;
+        screenY[y][l] = LANELINE;
     }
     console.timeEnd('middlecheck');
     console.time('currentlanedetect');
@@ -118,18 +123,18 @@ fs.readFile(inputfile, function(err, buf) {
     const set2 = (x, y) => {
         if (!screenY[y]) return 0;
         if (!screenY[y][x]) return 0;
-        if (screenY[y][x] != 1) return 0;
-        screenY[y][x] = 2;
+        if (screenY[y][x] != LIGHTPIXEL) return 0;
+        screenY[y][x] = LANELINE;
         return 1;
     };
 
     for (let y = 0; y < screenY.length; y++) {
         let changes = 1;
         while(changes != 0) {
-            //grow twos horizontally
+            //grow LANELINEs horizontally
             changes = 0;
             for (let x = 0; x < screenY[y].length; x++) {
-                if (screenY[y][x] != 2) continue;
+                if (screenY[y][x] != LANELINE) continue;
                 changes += set2(x+1, y) + set2(x-1, y);
                 changes += set2(x, y+1) + set2(x, y-1);
             }
@@ -137,19 +142,63 @@ fs.readFile(inputfile, function(err, buf) {
     }
     console.timeEnd('currentlanedetect');
     console.time('otherlaneclear');
-    screenY = screenY.map(y => y.map(x => x == 1? 0 : x));
+    screenY = screenY.map(y => y.map(x => x == LIGHTPIXEL? 0 : x));
     console.timeEnd('otherlaneclear');
 
     if (CREATEPROCESSINGIMAGES) {
         const pi = new PngImg(buf);
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                pi.set(x, y, screenY[y][x] == 2? '#000000': '#ffffff');
+                pi.set(x, y, screenY[y][x] == LANELINE? '#000000': '#ffffff');
             }
         }
         pi.save('./result/process3_lane.png', onerror);
     }
 
-    
+    console.time('houghcalc');
+    const points = [];
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            if (screenY[y][x] != LANELINE) continue;
+            points.push([x, y]);
+        }
+    }
+    const houghY = [];
+    for (let y = 0; y < height; y++) {
+        const houghX = [];
+        for (let x = 0; x < width; x++) {
+            houghX.push(0);
+        }
+        houghY.push(houghX);
+    }
+    console.log(points.length);
+    for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        const r = omega => (p[0] * Math.cos(omega)) + (p[1] * Math.sin(omega));
+        for (let x = 0; x < width; x++) {
+            const y = Math.round( r((x * Math.PI / 180) - 160) * 0.2 ) + 90;
+
+            if (y < 0 || y >= height) continue;
+            houghY[y][x] += 1;
+        }
+    }
+
+    if (CREATEPROCESSINGIMAGES) {
+        const pi = new PngImg(buf);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const g = houghY[y][x];
+                pi.set(x, y, {
+                    r: g,
+                    g: g,
+                    b: g,
+                    a: 255
+                });
+            }
+        }
+        pi.save('./result/process5_lines.png', onerror);
+    }
+
+
     console.timeEnd('full');
 });
