@@ -1,12 +1,11 @@
-const inputfile = 'test.png';
+const inputfile = 'test.jpg';
 const percentile = 0.95; // percentile threshold for determining lines
-const CUTOFFDYNAMIC = true;
-const CREATEPROCESSINGIMAGES = true;
-
+const CUTOFFDYNAMIC = false;
+const CREATEPROCESSINGIMAGES = false;
+const RASPISTILL = true;
 
 const LANELINE = 2;
 const LIGHTPIXEL = 1;
-
 
 const fs = require('fs');
 const PngImg = require('png-img');
@@ -19,7 +18,7 @@ try {
 console.time('full');
 console.time('getimage')
 
-fs.readFile(inputfile, function(err, buf) {
+const cb = function(err, buf) {
     if (err) throw err;
 
     const image = new PngImg(buf);
@@ -120,26 +119,26 @@ fs.readFile(inputfile, function(err, buf) {
     console.timeEnd('middlecheck');
     console.time('currentlanedetect');
 
-    const set2 = (x, y) => {
-        if (!screenY[y]) return 0;
-        if (!screenY[y][x]) return 0;
-        if (screenY[y][x] != LIGHTPIXEL) return 0;
-        screenY[y][x] = LANELINE;
-        return 1;
-    };
+    // const set2 = (x, y) => {
+    //     if (!screenY[y]) return 0;
+    //     if (!screenY[y][x]) return 0;
+    //     if (screenY[y][x] != LIGHTPIXEL) return 0;
+    //     screenY[y][x] = LANELINE;
+    //     return 1;
+    // };
 
-    for (let y = 0; y < screenY.length; y++) {
-        let changes = 1;
-        while(changes != 0) {
-            //grow LANELINEs horizontally
-            changes = 0;
-            for (let x = 0; x < screenY[y].length; x++) {
-                if (screenY[y][x] != LANELINE) continue;
-                changes += set2(x+1, y) + set2(x-1, y);
-                changes += set2(x, y+1) + set2(x, y-1);
-            }
-        }
-    }
+    // for (let y = 0; y < screenY.length; y++) {
+    //     let changes = 1;
+    //     while(changes != 0) {
+    //         //grow LANELINEs horizontally
+    //         changes = 0;
+    //         for (let x = 0; x < screenY[y].length; x++) {
+    //             if (screenY[y][x] != LANELINE) continue;
+    //             changes += set2(x+1, y) + set2(x-1, y);
+    //             changes += set2(x, y+1) + set2(x, y-1);
+    //         }
+    //     }
+    // }
     console.timeEnd('currentlanedetect');
     console.time('otherlaneclear');
     screenY = screenY.map(y => y.map(x => x == LIGHTPIXEL? 0 : x));
@@ -156,49 +155,79 @@ fs.readFile(inputfile, function(err, buf) {
     }
 
     console.time('houghcalc');
-    const points = [];
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            if (screenY[y][x] != LANELINE) continue;
-            points.push([x, y]);
-        }
-    }
-    const houghY = [];
-    for (let y = 0; y < height; y++) {
-        const houghX = [];
-        for (let x = 0; x < width; x++) {
-            houghX.push(0);
-        }
-        houghY.push(houghX);
-    }
-    console.log(points.length);
-    for (let i = 0; i < points.length; i++) {
-        const p = points[i];
-        const r = omega => (p[0] * Math.cos(omega)) + (p[1] * Math.sin(omega));
-        for (let x = 0; x < width; x++) {
-            const y = Math.round( r((x * Math.PI / 180) - 160) * 0.2 ) + 90;
+    // const houghheight = 180;
+    // const houghwidth = 360;
+    // const points = [];
+    // for (let y = 0; y < height; y++) {
+    //     for (let x = 0; x < width; x++) {
+    //         if (screenY[y][x] != LANELINE) continue;
+    //         points.push([x, y]);
+    //     }
+    // }
+    // const houghY = [];
+    // for (let y = 0; y < houghheight; y++) {
+    //     const houghX = [];
+    //     for (let x = 0; x < houghwidth; x++) {
+    //         houghX.push(0);
+    //     }
+    //     houghY.push(houghX);
+    // }
 
-            if (y < 0 || y >= height) continue;
-            houghY[y][x] += 1;
-        }
-    }
-
-    if (CREATEPROCESSINGIMAGES) {
-        const pi = new PngImg(buf);
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const g = houghY[y][x];
-                pi.set(x, y, {
-                    r: g,
-                    g: g,
-                    b: g,
-                    a: 255
-                });
-            }
-        }
-        pi.save('./result/process4_lines.png', onerror);
-    }
-
+    // let houghMax = 0;
+    // for (let i = 0; i < points.length; i++) {
+    //     const p = points[i];
+    //     const r = omega => (p[0] * Math.cos(omega)) + (p[1] * Math.sin(omega));
+    //     for (let x = 0; x < houghwidth; x++) {
+    //         const y = Math.round( r((x * Math.PI / 180) - (houghwidth/2)) * 1 + houghheight/2 );
+    //         if (y < 0 || y >= houghheight) continue;
+    //         houghY[y][x] += 8;
+    //         if (houghY[y][x] > houghMax) {
+    //             houghMax = houghY[y][x];
+    //         }
+    //     }
+    // }
+    // houghMax *= 0.95;
+    console.timeEnd('houghcalc');
 
     console.timeEnd('full');
-});
+
+    if (CREATEPROCESSINGIMAGES) {
+        const pngjs = require('pngjs').PNG;
+        const im = new pngjs({
+            width: houghwidth,
+            height: houghheight
+        });
+
+        for (let y = 0; y < houghheight; y++) {
+            for (let x = 0; x < houghwidth; x++) {
+                const idx = (im.width * y + x) << 2;
+                const g = houghY[y][x] || 0;
+                if (g > houghMax) {
+                    im.data[idx    ] = 255;
+                    im.data[idx + 1] = 0;
+                    im.data[idx + 2] = 0;
+                } else {
+                    im.data[idx    ] = g;
+                    im.data[idx + 1] = g;
+                    im.data[idx + 2] = g;
+                }
+                im.data[idx + 3] = 0xff;
+
+            }
+        }
+        im.pack().pipe(fs.createWriteStream('./result/process5_lines.png'))
+    }
+
+};
+
+if (RASPISTILL) {
+    const { exec } = require('child_process');
+    exec('raspistill -w 160 -h 90 -q 100 -t 1ns -o - -x -bm -e png', { encoding: 'buffer', maxBuffer: 400 * 1024 }, (err ,stdout, stderr) => {
+        if (err) throw err;
+
+        //fs.writeFileSync('./buffer', stdout);
+        cb(null, stdout);
+    });
+} else {
+    fs.readFile(inputfile, cb);
+}

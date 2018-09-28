@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
-    "png-img": "^2.2.0"
+    "node-gd": "^1.5.4",
+    "png-img": "^2.2.0",
+    "pngjs": "^3.3.3"
   },
   "devDependencies": {},
   "scripts": {
