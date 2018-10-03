@@ -6,6 +6,7 @@ const height = 90;
 
 const houghMaxCutoff = 0.85; // percentile threshold for determining where lines are in hough space
 const lightnesspercentile = 0.95; // percentile threshold for determining lines
+const userYPos = height;
 const CUTOFFDYNAMIC = false;
 const CREATEPROCESSINGIMAGES = false;
 
@@ -28,6 +29,8 @@ console.time('getimage')
 
 fs.readFile(inputfile, function(err, buffer) {
     if (err) throw err;
+
+    const userXPos = Math.round(width/2);
 
     let screen = Buffer.alloc(width * height);
     let i = 0;
@@ -87,8 +90,9 @@ fs.readFile(inputfile, function(err, buffer) {
 
     console.time('middlecheck');
 
-    const startX = Math.round(width/2);
-    for (let y = Math.floor(height/3); y < height; y++) {
+    const startX = userXPos;
+    const points = [];
+    for (let y = Math.floor(height/3); y < height; y++,y++,y++) {
         let idx = y * width;
         let r = startX;
         let l = startX;
@@ -102,45 +106,15 @@ fs.readFile(inputfile, function(err, buffer) {
                 break;
             }
         }
-        screen[idx + r] = LANELINE;
-        screen[idx + l] = LANELINE;
-    }
-    console.timeEnd('middlecheck');
-    console.time('otherlaneclear');
-    for (let i = 0; i < screen.length; i++) {
-        if (screen[i] == LIGHTPIXEL) {
-            screen[i] = 0;
-        }
-    }
-    console.timeEnd('otherlaneclear');
-
-    if (CREATEPROCESSINGIMAGES) {
-        //create progress image
-        const pi = new PngImg(fs.readFileSync('./pixel.png'));
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                pi.set(x, y, screen[y * width + x] == LANELINE? '#000000': '#ffffff');
-            }
-        }
-        pi.save('./result/process3_lane.png', onerror);
+        points.push(idx + r, idx + l);
     }
 
     console.time('houghcalc');
-    console.time('houghcalc_points');
+    console.time('houghcalc_grid');
 
     const houghheight = 720;
     const houghwidth = 180;
-    const points = [];
 
-    // go through pixels (skipping some y values) and selecting points for hough space
-    for (let y = 0; y < height; y++,y++,y++) {
-        for (let x = 0; x < width; x++) {
-            if (screen[y * width + x] != LANELINE) continue;
-            points.push([x, y]);
-        }
-    }
-
-    console.timeEnd('houghcalc_points');
     console.time('houghcalc_grid');
 
     // allocate buffer according to hough height and width
@@ -153,8 +127,10 @@ fs.readFile(inputfile, function(err, buffer) {
     const hhwidth = houghwidth /2;
     const hhheight = houghheight /2;
     const degreetorad = Math.PI / 180;
+    const houghIndexes = [];
     for (let i = 0; i < points.length; i++) {
-        const p = points[i];
+        const idx = points[i];
+        const p = [ idx % width, Math.floor(idx / width) ];
 
         // r(o) = x * cos(o) + y * sin(o)
         const r = omega => (p[0] * Math.cos(omega)) + (p[1] * Math.sin(omega));
@@ -165,10 +141,14 @@ fs.readFile(inputfile, function(err, buffer) {
             if (y < 0 || y >= houghheight) continue;
 
             let idx = y * houghwidth + x;
+
             hough[idx] += 8;
             //calculate maximum hough value
             if (hough[idx] > houghMax) {
                 houghMax = hough[idx];
+                if (houghIndexes.indexOf(idx) == -1) {
+                    houghIndexes.push(idx);
+                }
             }
         }
     }
@@ -207,17 +187,19 @@ fs.readFile(inputfile, function(err, buffer) {
     }
 
     console.time('houghconvert');
-
+    // get index from cords
+    const getindex = (x, y) => y * houghwidth + x;
     const houghPoints = [];
-    for (let i = 0; i < hough.length; i++) {
+    for (let j = 0; j < hough.length; j++) {
+        let i = houghIndexes[j];
         if (hough[i] > houghMax) {
-            // get index from cords
-            const getindex = (x, y) => y * houghwidth + x;
             // easy function to get cords from index
-            const getcords = (i) => { return { x: (i % houghwidth), y: Math.floor(i / houghwidth) }};
+            const c = {
+                x: (i % houghwidth),
+                y: Math.floor(i / houghwidth)
+            };
 
-            const c = getcords(i);
-
+            console.time('houghconvert_nieghboursuppression');
             // neighbour suppression
             // this suppresses any lines that look much like the one we have detected at c
             hough[getindex(c.x   , c.y +1)] = 0;
@@ -228,6 +210,8 @@ fs.readFile(inputfile, function(err, buffer) {
             hough[getindex(c.x -1, c.y +1)] = 0;
             hough[getindex(c.x -1, c.y   )] = 0;
             hough[getindex(c.x -1, c.y -1)] = 0;
+            console.timeEnd('houghconvert_nieghboursuppression');
+            console.time('houghconvert_forcalc');
 
             // get omega from x cord
             const omegaRad = (c.x * degreetorad) - hhwidth;
@@ -244,8 +228,10 @@ fs.readFile(inputfile, function(err, buffer) {
 
             // push values to array
             houghPoints.push([velocity, constant]);
+            console.timeEnd('houghconvert_forcalc');
         }
     }
+    console.timeEnd('houghconvert');
 
     if (CREATEPROCESSINGIMAGES) {
         // create progress image
@@ -269,6 +255,25 @@ fs.readFile(inputfile, function(err, buffer) {
         im.pack().pipe(fs.createWriteStream('./result/process5_convert.png'));
     }
 
-    console.timeEnd('houghconvert');
+    console.time('userpos')
+    if (houghPoints.length > 2) {
+        console.error('more than 2 lines detected');
+    }
+
+    const functionize = p => y => (y - p[1]) / p[0];
+    const line1 = functionize(houghPoints[0]);
+    const line2 = functionize(houghPoints[1]);
+
+    const x = [line1(userYPos), line2(userYPos)];
+    const xl = Math.min(...x);
+    const xr = Math.max(...x);
+
+    const laneWidth = xr - xl;
+    const userPos = userXPos - xl;
+    const scaled = -1 + 2* (userPos/laneWidth);
+    console.log('returner', scaled, laneWidth, userPos);
+
+    console.timeEnd('userpos');
+
     console.timeEnd('full');
 });
