@@ -1,0 +1,11 @@
+{
+    "inputheight": 90,
+    "inputwidth": 160,
+    "lightnesspercentile": 0.85,
+    "houghMaxCutoff": 0.85,
+    "startY": 0.34,
+    "useRasPi": false,
+
+    "CUTOFFDYNAMIC": true,
+    "CREATEPROCESSINGIMAGES": true
+}
