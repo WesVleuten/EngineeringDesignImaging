@@ -19,6 +19,7 @@ const {
     startY,
     useRasPi,
     maxiterations,
+    leeway,
     CREATEPROCESSINGIMAGES
 } = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 let lightnesscutoff = startinglightnesscutoff;
@@ -234,6 +235,20 @@ const alg = (err, buffer, pitteration) => {
     const laneWidth = xr - xl;
     const userPos = process.user.x - xl;
     const scaled = -1 + 2 * (userPos / laneWidth);
+
+    if (useRasPi) {
+        if (scaled < -1 * leeway) {
+            gpio.write(18, 1, function() { });
+        } else {
+            gpio.write(18, 0, function() { });
+        }
+        if (scaled > leeway) {
+            gpio.write(13, 1, function() { });
+        } else {
+            gpio.write(13, 0, function() { });
+        }
+    }
+
     console.log('Done!', scaled);
 };
 
@@ -266,4 +281,14 @@ const getfile = () => {
     }
 };
 
-getfile();
+if (useRasPi) {
+    const gpio = require("pi-gpio");
+
+    gpio.open(18, "output", function(err) {
+        gpio.open(13, "output", function(err) {
+            getfile();
+        });
+    });
+} else {
+    getfile();
+}
