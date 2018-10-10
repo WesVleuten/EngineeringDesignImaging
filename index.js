@@ -12,104 +12,95 @@ const PngImg = require('png-img');
 const { exec } = require('child_process');
 const onerror = (a, b) => { if (b) console.log(b); };
 const {
-    lightnesspercentile,
+    startinglightnesscutoff,
     houghMaxCutoff,
     inputwidth,
     inputheight,
     startY,
     useRasPi,
-    CUTOFFDYNAMIC,
+    maxiterations,
     CREATEPROCESSINGIMAGES
 } = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
-
+let lightnesscutoff = startinglightnesscutoff;
 const width = inputwidth;
 
 try {
     fs.mkdirSync('./result');
 } catch(e) {}
+try {
+    fs.mkdirSync('./frames');
+} catch(e) {}
 
-console.time('full');
-console.time('getimage')
-
-const alg = (err, buffer) => {
-    if (err) {
-        throw err;
-    }
-
-    const userXPos = Math.round(width/2);
-
+const imagestart = function(process, buffer) {
     const heightskipped = Math.floor(inputheight * startY);
-    const height = inputheight - heightskipped;
-    const screen = buffer.slice(heightskipped * inputwidth, inputheight * inputwidth);
+    process.width = inputwidth;
+    process.height = inputheight - heightskipped;
+    process.screen = Buffer.from(buffer.slice(heightskipped * inputwidth, inputheight * inputwidth));
+    process.user.y = process.height;
+    process.user.x = Math.round(width/2);
+};
 
-    const userYPos = height;
-
-    console.timeEnd('getimage');
-
+const lightness = function(process) {
     if (CREATEPROCESSINGIMAGES) {
-        //create progress image
         const pi = new PngImg(fs.readFileSync('./pixel.png'));
-        pi.setSize(width,height);
-        for (let i = 0; i < screen.length; i++) {
-            const x = i % width;
-            const y = Math.floor(i / width);
-            pi.set(x, y, {
-                r: screen[i],
-                g: screen[i],
-                b: screen[i],
-                a: 255
-            });
+        for (let y = 0; y < process.height; y++) {
+            const prey = y * process.width;
+            for (let x = 0; x < process.width; x++) {
+                let pp = process.screen[prey + x];
+                let p = pp.toString('16');
+                if (p.length < 2) {
+                    p = '0' + p;
+                }
+                pi.set(x, y, '#' + p+p+p);
+            }
         }
-        pi.save('./result/process1_lightness.png', onerror);
+        pi.save('./result/process1_lines.png', onerror);
     }
-    //calculate lightness cutoff point
-    let lightnesscutoff = lightnessc({ lightness: screen, lightnesspercentile, CUTOFFDYNAMIC });
-    console.time('lightgrid');
 
-    //apply lightness cutoff
-    for (let i = 0; i < screen.length; i++) {
-        if (screen[i] < lightnesscutoff) {
-            screen[i] = 0;
+    for (let i = 0; i < process.screen.length; i++) {
+        if (process.screen[i] < lightnesscutoff) {
+            process.screen[i] = 0;
         } else {
-            screen[i] = LIGHTPIXEL;
+            process.screen[i] = LIGHTPIXEL;
         }
     }
-    console.timeEnd('lightgrid');
 
     if (CREATEPROCESSINGIMAGES) {
         //create progress image
         const pi = new PngImg(fs.readFileSync('./pixel.png'));
-        for (let y = 0; y < height; y++) {
-            const prey = y * width;
-            for (let x = 0; x < width; x++) {
-                pi.set(x, y, screen[prey + x] == 1? '#000000': '#ffffff');
+        for (let y = 0; y < process.height; y++) {
+            const prey = y * process.width;
+            for (let x = 0; x < process.width; x++) {
+                pi.set(x, y, process.screen[prey + x] == LIGHTPIXEL? '#000000': '#ffffff');
             }
         }
         pi.save('./result/process2_lines.png', onerror);
     }
 
-    console.time('middlecheck');
+};
 
-    const startX = userXPos;
-    const points = [];
-    for (let y = 0; y < height; y++,y++,y++) {
-        let idx = y * width;
+const middlecheck = function(process) {
+    const startX = process.user.x;
+    process.middlepoints = [];
+    for (let y = 0; y < process.height; y++,y++,y++) {
+        let idx = y * process.width;
         let r = startX;
         let l = startX;
-        while(screen[idx + r++] == 0) {
+        while(process.screen[idx + r++] == 0) {
             if (r > width) {
                 break;
             }
         }
-        while(screen[idx + l--] == 0) {
+        while(process.screen[idx + l--] == 0) {
             if (l < 0) {
                 break;
             }
         }
-        points.push(idx + r, idx + l);
+        process.middlepoints.push(idx + r, idx + l);
     }
-    console.timeEnd('middlecheck');
-    console.time('houghcalc');
+};
+
+const hough = function(process) {
     const houghheight = 720;
     const houghwidth = 180;
 
@@ -121,12 +112,14 @@ const alg = (err, buffer) => {
     const hhheight = houghheight /2;
     const degreetorad = Math.PI / 180;
     const houghIndexes = [];
+    const points = process.middlepoints;
     for (let i = 0; i < points.length; i++) {
         const idx = points[i];
-        const p = [ idx % width, Math.floor(idx / width) ];
+        const pointA = idx % width;
+        const pointB = Math.floor(idx / width);
 
         // r(o) = x * cos(o) + y * sin(o)
-        const r = omega => (p[0] * Math.cos(omega)) + (p[1] * Math.sin(omega));
+        const r = omega => (pointA * Math.cos(omega)) + (pointB * Math.sin(omega));
         for (let x = 0; x < houghwidth; x++) {
 
             // calculate all y values for all x-es
@@ -147,38 +140,6 @@ const alg = (err, buffer) => {
     }
     houghMax *= houghMaxCutoff;
 
-    console.timeEnd('houghcalc');
-
-    if (CREATEPROCESSINGIMAGES) {
-        // create progress image
-        const pngjs = require('pngjs').PNG;
-        const im = new pngjs({
-            width: houghwidth,
-            height: houghheight
-        });
-
-        for (let y = 0; y < houghheight; y++) {
-            for (let x = 0; x < houghwidth; x++) {
-                const idx = (im.width * y + x) << 2;
-                const g = hough[y * houghwidth + x] || 0;
-                if (g > houghMax) {
-                    im.data[idx    ] = 255;
-                    im.data[idx + 1] = 0;
-                    im.data[idx + 2] = 0;
-                } else {
-                    im.data[idx    ] = g;
-                    im.data[idx + 1] = g;
-                    im.data[idx + 2] = g;
-                }
-                im.data[idx + 3] = 0xff;
-
-            }
-        }
-        im.pack().pipe(fs.createWriteStream('./result/process4_lines.png'))
-
-    }
-
-    console.time('houghconvert');
     // get index from cords
     const getindex = (x, y) => y * houghwidth + x;
     const houghPoints = [];
@@ -191,7 +152,6 @@ const alg = (err, buffer) => {
                 y: Math.floor(i / houghwidth)
             };
 
-            console.time('houghconvert_nieghboursuppression');
             // neighbour suppression
             // this suppresses any lines that look much like the one we have detected at c
             hough[getindex(c.x   , c.y +1)] = 0;
@@ -202,8 +162,6 @@ const alg = (err, buffer) => {
             hough[getindex(c.x -1, c.y +1)] = 0;
             hough[getindex(c.x -1, c.y   )] = 0;
             hough[getindex(c.x -1, c.y -1)] = 0;
-            console.timeEnd('houghconvert_nieghboursuppression');
-            console.time('houghconvert_forcalc');
 
             // get omega from x cord
             const omegaRad = (c.x * degreetorad) - hhwidth;
@@ -220,65 +178,92 @@ const alg = (err, buffer) => {
 
             // push values to array
             houghPoints.push([velocity, constant]);
-            console.timeEnd('houghconvert_forcalc');
         }
     }
-    console.timeEnd('houghconvert');
+    return houghPoints;
+};
 
-    if (CREATEPROCESSINGIMAGES) {
-        // create progress image
-        const pngjs = require('pngjs').PNG;
-        const im = new pngjs({
-            width: width,
-            height: height
-        });
+const alg = (err, buffer, pitteration) => {
+    if (err) {
+        throw err;
+    }
+    const itteration = pitteration || 0;
+    if (itteration >= maxiterations) {
+        console.error('Too many itterations done, buffer unreadable');
+        return;
+    }
 
-        for (let i = 0; i < houghPoints.length; i++) {
-            for (let x = 0; x < width; x++) {
-                const y = Math.round(houghPoints[i][0] * x + houghPoints[i][1]);
-                const idx = (im.width * y + x) << 2;
-                if (idx < 0 || idx >= im.data.length) continue;
-                im.data[idx    ] = 0xff;
-                im.data[idx + 1] = 0xff;
-                im.data[idx + 2] = 0xff;
-                im.data[idx + 3] = 0xff;
-            }
+    const process = {
+        height: null,
+        width: null,
+        screen: null,
+        user: {
+            y: null,
+            x: null
         }
-        im.pack().pipe(fs.createWriteStream('./result/process5_convert.png'));
-    }
+    };
 
-    console.time('userpos')
-    if (houghPoints.length > 2) {
-        console.error('more than 2 lines detected');
+    imagestart(process, buffer);
+
+    lightness(process);
+
+    middlecheck(process);
+
+    const houghPoints = hough(process);
+
+
+    if (houghPoints.length != 2) {
+        console.error('more or less than 2 lines detected');
+        lightnesscutoff += 4;
+        if (lightnesscutoff > 255) {
+            lightnesscutoff = 0;
+        }
+        alg(null, buffer, itteration + 1);
+        return;
     }
-    console.log(houghPoints);
+    console.log('got 2 lines');
 
     const functionize = p => y => (y - p[1]) / p[0];
     const line1 = functionize(houghPoints[0]);
     const line2 = functionize(houghPoints[1]);
 
-    const x = [line1(userYPos), line2(userYPos)];
+    const x = [line1(process.user.y), line2(process.user.y)];
     const xl = Math.min(x[0], x[1]);
     const xr = Math.max(x[0], x[1]);
 
     const laneWidth = xr - xl;
-    const userPos = userXPos - xl;
+    const userPos = process.user.x - xl;
     const scaled = -1 + 2 * (userPos / laneWidth);
     console.log('Done!', scaled);
-    console.timeEnd('userpos');
-    console.timeEnd('full');
 };
 
-if (useRasPi) {
-    console.log('using raspiyuv');
-    exec(`raspiyuv -l -t 1ns -o ./raspiyuvbuffer -w ${inputwidth} -h ${inputheight}`, (err, stdout, stderr) => {
-        fs.readFile('./raspiyuvbuffer', function(err, data) {
-            alg(err, data);
+
+let testfileQueue = [];
+const getfile = () => {
+    if (useRasPi) {
+        console.log('using raspiyuv');
+        const filename = './frames/raspiyuvbuffer_' + Date.now();
+        exec(`raspiyuv --luma --timeout 1 --output ${filename} --width ${inputwidth} --height ${inputheight}`, (err, stdout, stderr) => {
+            console.log(err, stdout, stderr);
+            fs.readFile(filename, function(err, data) {
+                alg(err, data);
+                getfile();
+            });
         });
-    });
-} else {
-    console.log('using testfile');
-    fs.readFile(inputfile, function(err, data) {
-        alg(err, data);
-    });
-}
+    } else {
+        if (testfileQueue.length == 0) {
+            testfileQueue = fs.readdirSync('./frames');
+        }
+        let f = testfileQueue.shift();
+        while (f.length > 1 && f[0] == '.') {
+            f = testfileQueue.shift();
+        }
+        console.log('using testfile', f);
+        fs.readFile('./frames/' + f, function(err, data) {
+            alg(err, data);
+            getfile();
+        });
+    }
+};
+
+getfile();
