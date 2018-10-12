@@ -19,4 +19,20 @@ For the image capture we have found that the `raspiyuv` command works best. With
 
 ### Line isolation
 
-Now we have a buffer containing the luminosity of every pixel. We filter through the buffer and determine a cutoff point
+Now we have a buffer containing the luminosity of every pixel. We use a cutoff point prevously determined or determined by the config. With this cutoff point we go through the buffer and setting every pixel either 1 or 0. 1 meaning there is a line here and 0 being ther isn't a line here.
+
+### Middle-out current lane
+
+Using the middle of the picture we can find the lines that the current user is in. Going from the middle vertically outwards we set the first pixel we find being one to a two.
+
+After this we remove all 1's from the picture, leaving only the 2's behind showing a picture containing only some pixels which represent the lines of the user's lane.
+
+### Hough
+
+Now we get to the fun stuff. Using the hough algorithm we can get mathametical lines by putting in all pixels. Every "1" pixel determined by the perious part of the algorithm is transformed into a sinus, the sinus repesents all different lines that can go through that pixel. Using the crosspoints of those sinuses we can determine the line that goes through all those points.
+
+If we find 2 crosspoints we can go on to the next part of the algorithm. But if we don't we return to the previous part "Line isolation" and adjust the cutoff point.
+
+### Hough calculation
+
+Now we have 2 crosspoints in hough space. We need to convert them to somehting we can use in mathametical terms.
