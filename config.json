@@ -6,6 +6,7 @@
     "startY": 0.34,
     "useRasPi": false,
     "maxiterations": 100,
+    "leeway": 0.5,
 
     "CUTOFFDYNAMIC": true,
     "CREATEPROCESSINGIMAGES": true

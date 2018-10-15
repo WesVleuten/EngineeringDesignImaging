@@ -238,14 +238,12 @@ const alg = (err, buffer, pitteration) => {
 
     if (useRasPi) {
         if (scaled < -1 * leeway) {
-            gpio.write(18, 1, function() { });
-        } else {
-            gpio.write(18, 0, function() { });
+            // goto right
+            exec(`aplay ./beep_R.wav`);
         }
         if (scaled > leeway) {
-            gpio.write(13, 1, function() { });
-        } else {
-            gpio.write(13, 0, function() { });
+            // goto left
+            exec(`aplay ./beep_L.wav`);
         }
     }
 
