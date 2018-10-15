@@ -9,9 +9,9 @@ First and foremost we need to capture an image from the sensor. Because of the n
 
 The Raspberry Pi Zero lacks audio output. However the program requires one, this means we had to make one ourselves. You can easily attach an audio jack to the following GPIO pins.
 
-GPIOXX | Left channel
-GPIOXX | Right channel
-GPIOXX | Ground
+PWM0 | GPIO18 [pin 12] | Left channel
+PWM1 | GPIO19 [pin 33] | Right channel
+GND | Ground [pin 39] | Ground
 
 ### Image capture
 
