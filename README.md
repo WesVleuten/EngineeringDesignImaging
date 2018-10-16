@@ -9,6 +9,13 @@ npm install
 sudo sh installgpuiofunction.sh
 ```
 
+We also need to 'force' the use of the headphone jack. We can do this by running the following command
+```
+sudo raspi-config
+```
+Goto "advanced options", then "audio", then enable "Force 3.5mm (headphone)".
+
+
 ## Startup-prepare
 This should only be done once before you start up the program. This could be automated on startup of the raspberry pi
 ```
@@ -70,7 +77,17 @@ y = - ( cos(omega) / sin(omega) ) * x + r / sin(omega)
 Using the mahtametical formulas and the assumtion that the user is in the middle of the picture we can determine where the user is on the lane. 
 
 ```
-position = -1 + 2 * (screenMiddle - leftline) / (rightline - leftline)
+position = -1 + 2 * (screenMiddle - leftLine) / (rightLine - leftLine)
 ```
 
 This forumla return a value between -1 and 1. This determines the position in lane with -1 being left side, 1 being the right side and 0 being the middle of the lane. You can set a leeway variable so it beeps after corssing a surten point.
+
+
+### Audio output
+
+Using the pins described above we can output an audio signal. This is done via a command in the program simply playing a left channel audio wav file or a right channel. The file run is determined by the previous function.
+
+
+### Cycle
+
+After the program has started outputting audio it will capture the next frame. When the frame is caputred it will return to the line isolation part.
