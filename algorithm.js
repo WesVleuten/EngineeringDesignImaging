@@ -15,7 +15,8 @@ const algStart = (err, buffer, config) => {
 const alg = (process, buffer, config, pitteration) => {
 
     const {
-        maxiterations
+        maxiterations,
+        leeway
     } = config
 
     const itteration = pitteration || 0;
