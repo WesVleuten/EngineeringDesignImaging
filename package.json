@@ -5,7 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "pi-gpio": "0.0.8",
-    "png-img": "^2.2.0"
+    "png-img": "^2.2.0",
+    "pngjs": "^3.3.3"
   },
   "devDependencies": {},
   "scripts": {

@@ -223,6 +223,7 @@ const alg = (err, buffer, pitteration) => {
         return;
     }
     console.log('got 2 lines');
+    lightnesscutoff -= 16;
 
     const functionize = p => y => (y - p[1]) / p[0];
     const line1 = functionize(houghPoints[0]);
@@ -279,14 +280,4 @@ const getfile = () => {
     }
 };
 
-if (useRasPi) {
-    const gpio = require("pi-gpio");
-
-    gpio.open(18, "output", function(err) {
-        gpio.open(13, "output", function(err) {
-            getfile();
-        });
-    });
-} else {
-    getfile();
-}
+getfile();
