@@ -3,6 +3,7 @@ console.log('Ready');
 const fs = require('fs');
 const pngjs = require('pngjs').PNG;
 const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+config.analyse = true;
 
 try {
     fs.mkdirSync('./frames');
@@ -13,10 +14,10 @@ try {
 
 const alg = require('./algorithm.js');
 
-/*
-const framefolder = 'frames_walking3_camfacingdown';
+//*
+const framefolder = 'frames_2g_sanding_right';
 /*/
-const framefolder = 'frames'
+const framefolder = 'f2';
 //*/
 
 let testfileQueue = fs.readdirSync('./' + framefolder);
@@ -43,10 +44,36 @@ const getfile = () => {
             height: 90
         });
         im.data = rgba;
-        im.pack().pipe(fs.createWriteStream(`./analyse/${f}.png`));
 
-        const r = alg(err, data, config);
-        fs.writeFileSync(`./analyse/${f}.json`, JSON.stringify(r), 'utf8');
+        const r = alg(err, f, data, config);
+        if (typeof r == 'string') {
+            console.log(r);
+        }
+        if (r.scaled > 1 || r.scaled < -1) {
+            im.pack().pipe(fs.createWriteStream(`./analyse/${f}_.png`));
+            fs.writeFileSync(`./analyse/${f}_x.json`, JSON.stringify(r), 'utf8');
+            const process = r.process;
+            const im2 = new pngjs({
+                width: process.input.width,
+                height: process.input.height
+            });
+            for (let i = 0; i < process.middlepoints.length; i++) {
+                const mp = process.middlepoints[i];
+                const index = (process.slice[0] * 4) + mp * 4;
+                im2.data[index] = 0xff;
+                im2.data[index+1] = 0xff;
+                im2.data[index+2] = 0xff;
+                im2.data[index+3] = 0xff;
+            }
+            for (let y = 0; y < process.height; y++) {
+                const index =  4 * (process.slice[0] + process.width * y + process.user.x);
+                im2.data[index] = 0xff;
+                im2.data[index+1] = 0x00;
+                im2.data[index+2] = 0x00;
+                im2.data[index+3] = 0xff;
+            }
+            im2.pack().pipe(fs.createWriteStream('./analyse/' + process.name + '_l.png'))
+        }
         getfile();
     });
 };

@@ -2,18 +2,20 @@ const imagestart = require('./lib/start');
 const lightness = require('./lib/lightness');
 const middlecheck = require('./lib/middlecheck');
 const hough = require('./lib/hough');
+const { exec } = require('child_process');
+const fs = require('fs');
 
-const algStart = (err, buffer, config) => {
+const algStart = (err, name, buffer, config) => {
     if (err) {
         throw err;
     }
 
     const process = imagestart(buffer, config);
-    alg(process, buffer, config, 0);
+    process.name = name;
+    return alg(process, buffer, config, 0);
 };
 
 const alg = (process, buffer, config, pitteration) => {
-
     const {
         maxiterations,
         leeway
@@ -21,30 +23,57 @@ const alg = (process, buffer, config, pitteration) => {
 
     const itteration = pitteration || 0;
     if (itteration >= maxiterations) {
-        console.error('Too many itterations done, buffer unreadable');
-        return;
+        return 'Too many itterations done, buffer unreadable';
     }
 
-    process.screen = Buffer.from(buffer.slice(process.slice[0], process.slice[1]));
+    const increaseLightness = () => {
+        process.lightnesscutoff -= 2;
+        if (process.lightnesscutoff < 0) {
+            process.lightnesscutoff = 255;
+        }
+        return alg(process, buffer, config, itteration + 1);
+    };
 
+    process.screen = Buffer.from(buffer.slice(process.slice[0], process.slice[1]));
 
     lightness(process);
 
     middlecheck(process);
 
     const houghPoints = hough(process, config);
+
     if (houghPoints.length != 2) {
-        console.error('more or less than 2 lines detected (' + houghPoints.length + ')');
-        process.lightnesscutoff -= 4;
-        if (process.lightnesscutoff < 0) {
-            process.lightnesscutoff = 255;
-        }
-        alg(process, buffer, config, itteration + 1);
-        return;
+        //console.error('more or less than 2 lines detected (' + houghPoints.length + ')');
+        return increaseLightness();
     }
-    console.log('got 2 lines');
-    if (process.lightnesscutoff < 239) {
-        process.lightnesscutoff += 16;
+
+    const velocity1 = houghPoints[0][0];
+    const velocity2 = houghPoints[1][0];
+    if (Math.abs(velocity1 - velocity2) < 2) {
+        return increaseLightness();
+    }
+    console.log('got 2 lines', houghPoints);
+
+
+    if (config.analyse) {
+        const pngjs = require('pngjs').PNG;
+        const im = new pngjs({
+            width: process.width,
+            height: process.height
+        });
+
+        for (let i = 0; i < houghPoints.length; i++) {
+            for (let x = 0; x < process.width; x++) {
+                const y = Math.round(houghPoints[i][0] * x + houghPoints[i][1]);
+                const idx = (im.width * y + x) << 2;
+                if (idx < 0 || idx >= im.data.length) continue;
+                im.data[idx    ] = 0xff;
+                im.data[idx + 1] = 0xff;
+                im.data[idx + 2] = 0xff;
+                im.data[idx + 3] = 0xff;
+            }
+        }
+        im.pack().pipe(fs.createWriteStream('./analyse/' + process.name + '_m.png'));
     }
 
     const functionize = p => y => (y - p[1]) / p[0];
@@ -60,23 +89,61 @@ const alg = (process, buffer, config, pitteration) => {
     const scaled = -1 + 2 * (userPos / laneWidth);
 
     if (config.useRasPi) {
-        if (scaled < -1 * leeway) {
-            // goto right
-            exec(`aplay ./beep_R.wav`);
-        }
-        if (scaled > leeway) {
-            // goto left
-            exec(`aplay ./beep_L.wav`);
+        const left = scaled < -1 * leeway;
+        const right = scaled > leeway;
+        const inverted = config.invertedOutput;
+        if (scaled >= -1 && scaled <= 1) {
+            if ((left && !inverted) || (right && inverted)) {
+                // goto right
+                exec(`aplay ./beep/beep_R.wav`);
+            }
+            if ((right && !inverted) || (left && inverted)) {
+                // goto left
+                exec(`aplay ./beep/beep_L.wav`);
+            }
         }
     }
+
+    if (process.lightnesscutoff < 255-32) {
+        process.lightnesscutoff += 32;
+    }
+
     const r = {
         laneWidth,
         userPos,
         scaled,
         xl,
-        xr
+        xr,
+        process,
+        toJSON: () => {
+            return {
+                laneWidth,
+                userPos,
+                scaled,
+                xl,
+                xr
+            };
+        }
     };
-    console.log('Done!', r);
+
+    if (config.analyse && (r.scaled > 1 || r.scaled < -1)) {
+        const pngjs = require('pngjs').PNG;
+        const im = new pngjs({
+            width: 160,
+            height: 90
+        });
+        for (let i = 0; i < process.screen.length; i++) {
+            if (process.screen[i] == 1) continue;
+            const index = (process.slice[0] + i) * 4;
+            im.data[index] = 0xff;
+            im.data[index +1] = 0xff;
+            im.data[index +2] = 0xff;
+            im.data[index +3] = 0xff;
+        }
+        im.pack().pipe(fs.createWriteStream('./analyse/' + process.name + '_k.png'));
+    }
+
+    console.log('Done!', scaled);
     return r;
 };
 

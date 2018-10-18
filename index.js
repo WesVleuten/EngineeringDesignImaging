@@ -8,6 +8,9 @@ try {
     fs.mkdirSync('./frames');
 } catch(e) {}
 
+const { exec } = require('child_process');
+exec(`aplay ./beep/beep.wav`);
+
 const alg = require('./algorithm.js');
 const capture = require('./lib/capture');
 
@@ -17,5 +20,4 @@ const getfile = () => {
         getfile();
     });
 };
-
 getfile();
