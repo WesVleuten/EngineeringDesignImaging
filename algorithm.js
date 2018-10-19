@@ -55,7 +55,7 @@ const alg = (process, buffer, config, pitteration) => {
     console.log('got 2 lines', houghPoints);
 
 
-    if (config.analyse) {
+    if (config.analyse && false) {
         const pngjs = require('pngjs').PNG;
         const im = new pngjs({
             width: process.width,
@@ -85,6 +85,9 @@ const alg = (process, buffer, config, pitteration) => {
     const xr = Math.max(x[0], x[1]);
 
     const laneWidth = xr - xl;
+    if (laneWidth < 5) {
+        return increaseLightness();
+    }
     const userPos = process.user.x - xl;
     const scaled = -1 + 2 * (userPos / laneWidth);
 
@@ -121,7 +124,8 @@ const alg = (process, buffer, config, pitteration) => {
                 userPos,
                 scaled,
                 xl,
-                xr
+                xr,
+                vd: velocity1 - velocity2
             };
         }
     };

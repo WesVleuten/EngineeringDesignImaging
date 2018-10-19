@@ -47,7 +47,7 @@ const getfile = () => {
 
         const r = alg(err, f, data, config);
         if (typeof r == 'string') {
-            console.log(r);
+            fs.writeFileSync(`./analyse/${f}_x.err`, r, 'utf8');
         }
         if (r.scaled > 1 || r.scaled < -1) {
             im.pack().pipe(fs.createWriteStream(`./analyse/${f}_.png`));
