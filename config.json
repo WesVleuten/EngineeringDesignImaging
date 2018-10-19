@@ -1,6 +1,11 @@
 {
     "inputheight": 90,
     "inputwidth": 160,
+    "input": {
+        "height": 90,
+        "width": 160,
+        "exposure": "sports"
+    },
     "startinglightnesscutoff": 0,
     "houghMaxCutoff": 0.85,
     "startY": 0.34,
