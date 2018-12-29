@@ -16,7 +16,7 @@ const capture = require('./lib/capture');
 
 const getfile = () => {
     capture(config, function(err, data) {
-        alg(err, data, config);
+        alg(err, '', data, config);
         getfile();
     });
 };

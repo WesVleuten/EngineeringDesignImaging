@@ -15,7 +15,7 @@ try {
 const alg = require('./algorithm.js');
 
 //*
-const framefolder = 'frames_2g_sanding_right';
+const framefolder = 'frames_3g_1';
 /*/
 const framefolder = 'f2';
 //*/
@@ -49,7 +49,7 @@ const getfile = () => {
         if (typeof r == 'string') {
             fs.writeFileSync(`./analyse/${f}_x.err`, r, 'utf8');
         }
-        if (r.scaled > 1 || r.scaled < -1) {
+        if (true) {
             im.pack().pipe(fs.createWriteStream(`./analyse/${f}_.png`));
             fs.writeFileSync(`./analyse/${f}_x.json`, JSON.stringify(r), 'utf8');
             const process = r.process;

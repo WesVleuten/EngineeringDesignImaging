@@ -130,7 +130,7 @@ const alg = (process, buffer, config, pitteration) => {
         }
     };
 
-    if (config.analyse && (r.scaled > 1 || r.scaled < -1)) {
+    if (true) {
         const pngjs = require('pngjs').PNG;
         const im = new pngjs({
             width: 160,
